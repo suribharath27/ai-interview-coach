@@ -25,6 +25,7 @@
       "package.json"
     ],
     "asar": true,
+    "afterPack": "./build/afterPack.cjs",
     "mac": {
       "category": "public.app-category.business",
       "target": [

@@ -11,11 +11,11 @@ When you screen-share a deck or product demo, this window stays on your screen a
 All versions: [Releases](https://github.com/suribharath27/ai-interview-coach/releases/latest)
 
 1. Open the DMG → drag **Meeting Cue** to **Applications**
-2. If macOS says the app is **damaged**, that’s Gatekeeper on an unsigned build. In Terminal run:
+2. If macOS says the app is **damaged**, Gatekeeper blocked the unsigned download. In Terminal run:
    ```bash
-   xattr -cr "/Applications/Meeting Cue.app"
+   xattr -cr "/Applications/Meeting Cue.app" && codesign --force --deep --sign - "/Applications/Meeting Cue.app" && open "/Applications/Meeting Cue.app"
    ```
-   Then open Meeting Cue again (or right-click → **Open**).
+   Or: `bash scripts/fix-macos-open.sh` from this repo.
 3. Open Settings → add your **Groq** (speech) + **Gemini** (answers/screenshots) API keys
 
 ## Why this exists
