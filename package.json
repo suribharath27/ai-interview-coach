@@ -1,0 +1,90 @@
+{
+  "name": "meeting-cue",
+  "version": "1.0.0",
+  "description": "Private AI meeting cue for stakeholder calls — excluded from screen share on Windows and macOS",
+  "main": "dist-electron/main.js",
+  "author": "Final Year Project",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "dist": "vite build && electron-builder --mac --win",
+    "dist:mac": "vite build && electron-builder --mac dmg zip",
+    "dist:win": "vite build && electron-builder --win nsis portable",
+    "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.finalyear.meetingcue",
+    "productName": "Meeting Cue",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Meeting Cue needs the microphone to capture stakeholder questions during calls.",
+        "CFBundleDisplayName": "Meeting Cue"
+      }
+    },
+    "dmg": {
+      "title": "Meeting Cue",
+      "contents": [
+        {
+          "x": 140,
+          "y": 180,
+          "type": "file"
+        },
+        {
+          "x": 420,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Meeting Cue"
+    }
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.0.2",
+    "electron-builder": "^25.1.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  }
+}
