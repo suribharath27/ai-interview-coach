@@ -6,14 +6,14 @@ When you screen-share a deck or product demo, this window stays on your screen a
 
 ## Download
 
-**macOS (Apple Silicon):** get the latest installer from
-[Releases](https://github.com/suribharath27/ai-interview-coach/releases/latest)
+**macOS (Apple Silicon):**  
+[Download Meeting Cue 1.0.0 (.dmg)](https://github.com/suribharath27/ai-interview-coach/releases/download/v1.0.0/Meeting.Cue-1.0.0-arm64.dmg)  
+All versions: [Releases](https://github.com/suribharath27/ai-interview-coach/releases/latest)
 
-1. Download `Meeting Cue-1.0.0-arm64.dmg`
-2. Open the DMG → drag **Meeting Cue** to **Applications**
-3. First launch (unsigned build): right-click → **Open** → confirm  
+1. Open the DMG → drag **Meeting Cue** to **Applications**
+2. First launch (unsigned build): right-click → **Open** → confirm  
    or run: `xattr -cr "/Applications/Meeting Cue.app"`
-4. Open Settings → add your **Groq** (speech) + **Gemini** (answers/screenshots) API keys
+3. Open Settings → add your **Groq** (speech) + **Gemini** (answers/screenshots) API keys
 
 ## Why this exists
 
