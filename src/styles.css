@@ -1472,6 +1472,102 @@ select {
   max-width: none;
 }
 
+.perm-gate {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.perm-gate-intro,
+.perm-hint,
+.perm-ok,
+.perm-error,
+.perm-app-info {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.perm-app-info {
+  font-size: 11px;
+  word-break: break-all;
+  opacity: 0.85;
+}
+
+.perm-ok {
+  color: #1f7a4d;
+}
+
+.perm-error {
+  color: #b42318;
+}
+
+.perm-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 88%, #000 4%);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.perm-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.perm-row-main strong {
+  display: block;
+  font-size: 14px;
+}
+
+.perm-row-main p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.perm-pip {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #98a2b3;
+}
+
+.perm-row.is-ok .perm-pip {
+  background: #12b76a;
+}
+
+.perm-row.is-warn .perm-pip {
+  background: #f79009;
+}
+
+.perm-row.is-bad .perm-pip {
+  background: #f04438;
+}
+
+.perm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .home-hero,
 .settings-page header,
 .live-top {

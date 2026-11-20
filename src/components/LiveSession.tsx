@@ -559,6 +559,16 @@ export function LiveSession({
           return;
         }
       }
+      if (wantClient && window.meetingCue?.ensureScreenCapture) {
+        const screenAccess = await window.meetingCue.ensureScreenCapture();
+        if (!screenAccess.granted) {
+          setError(
+            screenAccess.message ||
+              "Screen Recording permission required for client/system audio."
+          );
+          return;
+        }
+      }
       if (!settings.apiKey.trim()) {
         setError("Add your Groq API key in Settings first.");
         onOpenSettings();
@@ -627,6 +637,17 @@ export function LiveSession({
   const toggleSystem = useCallback(async () => {
     const next = !systemOn;
     setError(null);
+    if (next && window.meetingCue?.ensureScreenCapture) {
+      const screenAccess = await window.meetingCue.ensureScreenCapture();
+      if (!screenAccess.granted) {
+        setError(
+          screenAccess.message ||
+            "Screen Recording permission required for client/system audio."
+        );
+        setSystemOn(false);
+        return;
+      }
+    }
     if (!listening) {
       setSystemOn(next);
       if (micOn || next) await startListening({ mic: micOn, client: next });

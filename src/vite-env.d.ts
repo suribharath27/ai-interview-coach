@@ -29,6 +29,35 @@ interface MeetingCueApi {
   setOverlayBrowserFullscreen: (enabled: boolean) => Promise<boolean>;
   setExcludeFromShare: (enabled: boolean) => Promise<boolean>;
   ensureMicrophone: () => Promise<{ granted: boolean; message?: string }>;
+  ensureScreenCapture: () => Promise<{ granted: boolean; message?: string }>;
+  prepareSessionMedia: () => Promise<{
+    microphone: { ok: boolean; status: string; message: string };
+    screen: { ok: boolean; status: string; message: string };
+  }>;
+  getMediaStatus: () => Promise<{
+    microphone: string;
+    screen: string;
+    packaged: boolean;
+  }>;
+  openScreenSettings: () => Promise<boolean>;
+  openMicSettings: () => Promise<boolean>;
+  resetMediaTcc: () => Promise<{
+    ok: boolean;
+    message: string;
+    results?: string[];
+  }>;
+  quitApp: () => Promise<boolean>;
+  getMediaAppInfo: () => Promise<{
+    name: string;
+    bundleId: string;
+    path: string;
+    execPath: string;
+    packaged: boolean;
+    screen: string;
+    microphone: string;
+  }>;
+  enableLoopbackAudio: (opts?: { useSystemPicker?: boolean }) => Promise<void>;
+  disableLoopbackAudio: () => Promise<void>;
   captureScreen: () => Promise<{ mimeType: string; base64: string }>;
   windowMinimize: () => Promise<boolean>;
   windowMaximize: () => Promise<void>;

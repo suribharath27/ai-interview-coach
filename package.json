@@ -1,12 +1,14 @@
 {
   "name": "meeting-cue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Private AI meeting cue for stakeholder calls — excluded from screen share on Windows and macOS",
   "main": "dist-electron/main.js",
   "author": "Final Year Project",
   "license": "MIT",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/patch-electron-macos-plist.cjs && vite",
+    "postinstall": "node scripts/patch-electron-macos-plist.cjs",
+    "ensure:codesign": "node build/ensure-codesign-identity.cjs",
     "build": "vite build",
     "dist": "vite build && electron-builder --mac --win",
     "dist:mac": "vite build && electron-builder --mac dmg zip",
@@ -36,7 +38,9 @@
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Meeting Cue needs the microphone to capture stakeholder questions during calls.",
+        "NSMicrophoneUsageDescription": "Meeting Cue needs the microphone to capture your voice during calls.",
+        "NSScreenCaptureUsageDescription": "Meeting Cue needs Screen Recording to hear system / meeting audio and capture on-screen questions.",
+        "NSAudioCaptureUsageDescription": "Meeting Cue needs system audio access to transcribe the other person on the call (macOS 14.2+).",
         "CFBundleDisplayName": "Meeting Cue"
       }
     },
@@ -71,6 +75,7 @@
     }
   },
   "dependencies": {
+    "electron-audio-loopback": "^1.0.6",
     "electron-store": "^8.2.0",
     "pdfjs-dist": "^4.10.38"
   },

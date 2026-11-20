@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CreateSession } from "./components/CreateSession";
 import { LiveSession } from "./components/LiveSession";
+import { SessionPermissionGate } from "./components/SessionPermissionGate";
 import { SessionReview } from "./components/SessionReview";
 import { TitleBar } from "./components/TitleBar";
 import { useClickOutside } from "./hooks/useClickOutside";
@@ -119,6 +120,7 @@ export default function App() {
   const [floated, setFloated] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openCardMenu, setOpenCardMenu] = useState<string | null>(null);
+  const [mediaReady, setMediaReady] = useState(false);
   const railMenuRef = useRef<HTMLDivElement | null>(null);
 
   const closeRailMenu = useCallback(() => setMenuOpen(false), []);
@@ -284,18 +286,24 @@ export default function App() {
   };
 
   const startSession = (session: SessionRecord) => {
+    if (!mediaReady) return;
     setActive(session);
     setActiveSessionId(session.id);
     setOpenCardMenu(null);
     setView("live");
   };
 
+  const goReady = (session: SessionRecord) => {
+    setActive(session);
+    setOpenCardMenu(null);
+    setMediaReady(false);
+    setView("ready");
+  };
+
   const restartSession = (session: SessionRecord) => {
     const next = restartSessionRun(session);
     refreshSessions();
-    setActive(next);
-    setOpenCardMenu(null);
-    setView("ready");
+    goReady(next);
   };
 
   const enterFloat = () => {
@@ -543,11 +551,7 @@ export default function App() {
                           <div className="interview-menu">
                             <button
                               type="button"
-                              onClick={() => {
-                                setActive(session);
-                                setOpenCardMenu(null);
-                                setView("ready");
-                              }}
+                              onClick={() => goReady(session)}
                             >
                               Details
                             </button>
@@ -631,10 +635,7 @@ export default function App() {
                           <button
                             type="button"
                             className="btn light small"
-                            onClick={() => {
-                              setActive(session);
-                              setView("ready");
-                            }}
+                            onClick={() => goReady(session)}
                           >
                             Start session
                           </button>
@@ -654,8 +655,7 @@ export default function App() {
           onCancel={() => setView("home")}
           onCreated={(session) => {
             refreshSessions();
-            setActive(session);
-            setView("ready");
+            goReady(session);
           }}
         />
       ) : null}
@@ -667,8 +667,8 @@ export default function App() {
             <h1>{active.details.companyName || "Untitled session"}</h1>
             <p>
               {active.preferences.autoAnswer
-                ? "Auto Answer is on — mic will listen when you start."
-                : "Auto Answer is off — you can listen manually after starting."}
+                ? "Auto Answer is on — mic and system audio will listen when you start."
+                : "Confirm permissions below, then start when mic and system audio are ready."}
             </p>
             <div className="pref-chips">
               <span>{active.preferences.model}</span>
@@ -679,13 +679,23 @@ export default function App() {
                 <span>STAR</span>
               ) : null}
             </div>
+            <SessionPermissionGate
+              key={active.id}
+              onReadyChange={setMediaReady}
+            />
             <div className="home-actions" style={{ marginTop: 18 }}>
               <button
                 type="button"
                 className="btn dark"
+                disabled={!mediaReady}
                 onClick={() => startSession(active)}
+                title={
+                  mediaReady
+                    ? "Start live session"
+                    : "Fix permissions above before starting"
+                }
               >
-                Start session
+                {mediaReady ? "Start session" : "Waiting for permissions…"}
               </button>
               {sessionHasHistory(active) ? (
                 <button
@@ -701,6 +711,7 @@ export default function App() {
                 className="btn light"
                 onClick={() => {
                   setActive(null);
+                  setMediaReady(false);
                   setView("home");
                 }}
               >

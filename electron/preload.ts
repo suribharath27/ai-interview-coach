@@ -29,6 +29,49 @@ const api = {
     ipcRenderer.invoke("window:set-exclude-from-share", enabled),
   ensureMicrophone: (): Promise<{ granted: boolean; message?: string }> =>
     ipcRenderer.invoke("media:ensure-microphone"),
+  ensureScreenCapture: (): Promise<{ granted: boolean; message?: string }> =>
+    ipcRenderer.invoke("media:ensure-screen-capture"),
+  prepareSessionMedia: (): Promise<{
+    microphone: { ok: boolean; status: string; message: string };
+    screen: { ok: boolean; status: string; message: string };
+  }> => ipcRenderer.invoke("media:prepare-session"),
+  getMediaStatus: (): Promise<{
+    microphone: string;
+    screen: string;
+    packaged: boolean;
+  }> => ipcRenderer.invoke("media:get-status"),
+  openScreenSettings: (): Promise<boolean> =>
+    ipcRenderer.invoke("media:open-screen-settings"),
+  openMicSettings: (): Promise<boolean> =>
+    ipcRenderer.invoke("media:open-mic-settings"),
+  resetMediaTcc: (): Promise<{
+    ok: boolean;
+    message: string;
+    results?: string[];
+  }> => ipcRenderer.invoke("media:reset-tcc"),
+  quitApp: (): Promise<boolean> => ipcRenderer.invoke("media:quit-app"),
+  getMediaAppInfo: (): Promise<{
+    name: string;
+    bundleId: string;
+    path: string;
+    execPath: string;
+    packaged: boolean;
+    screen: string;
+    microphone: string;
+  }> => ipcRenderer.invoke("media:app-info"),
+  enableLoopbackAudio: async (opts?: {
+    useSystemPicker?: boolean;
+  }): Promise<void> => {
+    // Default: direct loopback (no share sheet) — returns a real system-audio track.
+    await ipcRenderer.invoke(
+      "media:reinstall-loopback",
+      Boolean(opts?.useSystemPicker)
+    );
+  },
+  disableLoopbackAudio: async (): Promise<void> => {
+    // Keep direct loopback installed — clearing the handler breaks packaged capture.
+    await ipcRenderer.invoke("media:reinstall-loopback", false);
+  },
   captureScreen: (): Promise<{ mimeType: string; base64: string }> =>
     ipcRenderer.invoke("screen:capture"),
   windowMinimize: (): Promise<boolean> => ipcRenderer.invoke("window:minimize"),

@@ -7,16 +7,22 @@ When you screen-share a deck or product demo, this window stays on your screen a
 ## Download
 
 **macOS (Apple Silicon):**  
-[Download Meeting Cue 1.0.0 (.dmg)](https://github.com/suribharath27/ai-interview-coach/releases/download/v1.0.0/Meeting.Cue-1.0.0-arm64.dmg)  
+[Download Meeting Cue 1.0.1 (.dmg)](https://github.com/suribharath27/ai-interview-coach/releases/download/v1.0.1/Meeting.Cue-1.0.1-arm64.dmg)  
 All versions: [Releases](https://github.com/suribharath27/ai-interview-coach/releases/latest)
 
+### Install (important on macOS)
+
+GitHub downloads are quarantined by macOS. Without Apple notarization, the first open often fails with **“damaged”** or an instant crash — that is Gatekeeper, not a bad build.
+
 1. Open the DMG → drag **Meeting Cue** to **Applications**
-2. If macOS says the app is **damaged**, Gatekeeper blocked the unsigned download. In Terminal run:
+2. **Required once** — run this in Terminal (fixes damaged/crash on open):
    ```bash
-   xattr -cr "/Applications/Meeting Cue.app" && codesign --force --deep --sign - "/Applications/Meeting Cue.app" && open "/Applications/Meeting Cue.app"
+   xattr -cr "/Applications/Meeting Cue.app" && codesign --force --deep --sign - "/Applications/Meeting Cue.app" && open -a "Meeting Cue"
    ```
-   Or: `bash scripts/fix-macos-open.sh` from this repo.
-3. Open Settings → add your **Groq** (speech) + **Gemini** (answers/screenshots) API keys
+   Or from this repo: `bash scripts/fix-macos-open.sh`
+3. System Settings → Privacy & Security → enable **Meeting Cue** for Microphone, Screen & System Audio Recording, and **System Audio Recording Only**
+4. Fully quit (`Cmd+Q`) and reopen once after granting those
+5. In the app: Settings → add **Groq** (speech) + **Gemini** (answers/screenshots) API keys
 
 ## Why this exists
 

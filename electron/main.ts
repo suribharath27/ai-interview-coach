@@ -11,11 +11,18 @@ import {
   Notification,
   type NativeImage,
 } from "electron";
+import { initMain as initAudioLoopback } from "electron-audio-loopback";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import Store from "electron-store";
+
+// System-audio loopback for Electron 31–38. Must run before app ready.
+// forceCoreAudioTap: required on macOS 14.2+ / 15+ / 26 (Tahoe) where SCK
+// loopback is flaky and the native system picker often throws
+// "Error starting capture".
+initAudioLoopback({ forceCoreAudioTap: true });
 
 type AppSettings = {
   apiKey: string;
@@ -708,6 +715,57 @@ function attachAppActivationHandlers() {
   });
 }
 
+function openMacPrivacyPane(pane: "Microphone" | "ScreenCapture" | "AudioCapture") {
+  const map = {
+    Microphone:
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+    ScreenCapture:
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+    AudioCapture:
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+  } as const;
+  void shell.openExternal(map[pane]);
+}
+
+function installSystemAudioLoopbackHandler(options?: {
+  /** true = macOS share sheet (good for first-time System Audio TCC prompt). */
+  useSystemPicker?: boolean;
+}) {
+  const ses = session.defaultSession;
+  // IMPORTANT:
+  // - useSystemPicker:true often returns VIDEO ONLY on macOS (no audio track)
+  //   even when System Audio Recording Only is granted (Electron #44685).
+  // - useSystemPicker:false + audio:'loopback' is what actually delivers
+  //   samples once AudioCapture TCC is granted.
+  const useSystemPicker = Boolean(options?.useSystemPicker);
+  ses.setDisplayMediaRequestHandler(
+    async (_request, callback) => {
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ["screen"],
+          thumbnailSize: { width: 0, height: 0 },
+        });
+        const source =
+          sources.find((s) => /entire screen|screen 1|display/i.test(s.name)) ||
+          sources[0];
+        if (!source) {
+          console.warn(
+            "[media] no screen sources — grant Screen Recording, then Cmd+Q and reopen"
+          );
+          callback({});
+          return;
+        }
+        callback({ video: source, audio: "loopback" });
+      } catch (err) {
+        console.warn("[media] loopback handler failed", err);
+        callback({});
+      }
+    },
+    { useSystemPicker }
+  );
+  console.log(`[media] loopback handler installed useSystemPicker=${useSystemPicker}`);
+}
+
 function setupMediaPermissions() {
   const ses = session.defaultSession;
 
@@ -723,22 +781,7 @@ function setupMediaPermissions() {
     return permission === "media" || permission === "display-capture";
   });
 
-  ses.setDisplayMediaRequestHandler(async (_request, callback) => {
-    try {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 0, height: 0 },
-      });
-      const source = sources[0];
-      if (!source) {
-        callback({});
-        return;
-      }
-      callback({ video: source, audio: "loopback" });
-    } catch {
-      callback({});
-    }
-  });
+  installSystemAudioLoopbackHandler();
 }
 
 async function ensureMicrophoneAccess(): Promise<{
@@ -749,10 +792,11 @@ async function ensureMicrophoneAccess(): Promise<{
     const status = systemPreferences.getMediaAccessStatus("microphone");
     if (status === "granted") return { granted: true };
     if (status === "denied" || status === "restricted") {
+      openMacPrivacyPane("Microphone");
       return {
         granted: false,
         message:
-          "Microphone permission is blocked. Enable it in System Settings → Privacy & Security → Microphone for Meeting Cue / Electron.",
+          "Microphone permission is blocked. Enable it in System Settings → Privacy & Security → Microphone for Meeting Cue, then quit and reopen the app.",
       };
     }
     const granted = await systemPreferences.askForMediaAccess("microphone");
@@ -765,6 +809,120 @@ async function ensureMicrophoneAccess(): Promise<{
     }
   }
   return { granted: true };
+}
+
+function screenCaptureHelpMessage(status: string, sourceCount: number): string {
+  if (sourceCount === 0 && (status === "granted" || status === "denied")) {
+    return `Screen toggle may be on for an old Meeting Cue copy (duplicate rows). Turn BOTH Meeting Cue rows OFF, quit Meeting Cue (Cmd+Q), reopen, allow the new prompt, then Recheck. (status=${status}, screens=${sourceCount})`;
+  }
+  if (app.isPackaged) {
+    return `Screen Recording not available to this app yet (status=${status}, screens=${sourceCount}). Enable Meeting Cue in Screen & System Audio Recording, then Cmd+Q and reopen.`;
+  }
+  return `Local/dev Screen Recording is attributed to Cursor/Terminal (status=${status}, screens=${sourceCount}). Enable Cursor or Terminal, then restart npm run dev.`;
+}
+
+async function ensureScreenCaptureAccess(): Promise<{
+  granted: boolean;
+  message?: string;
+}> {
+  if (process.platform !== "darwin") return { granted: true };
+
+  // Ground truth = can we list screens? getMediaAccessStatus often lags or
+  // disagrees with toggles when duplicate ad-hoc Meeting Cue TCC rows exist.
+  let sources: Electron.DesktopCapturerSource[] = [];
+  try {
+    sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 1, height: 1 },
+    });
+  } catch (err) {
+    console.warn("[media] desktopCapturer probe failed", err);
+  }
+
+  const status = systemPreferences.getMediaAccessStatus("screen");
+  console.log(
+    `[media] screen status=${status} sources=${sources.length} packaged=${app.isPackaged}`
+  );
+
+  if (sources.length > 0) {
+    return { granted: true };
+  }
+
+  openMacPrivacyPane("ScreenCapture");
+  return {
+    granted: false,
+    message: screenCaptureHelpMessage(status, sources.length),
+  };
+}
+
+type MediaAccessCheck = {
+  ok: boolean;
+  status: string;
+  message: string;
+};
+
+async function prepareSessionMediaAccess(): Promise<{
+  microphone: MediaAccessCheck;
+  screen: MediaAccessCheck;
+}> {
+  const micResult = await ensureMicrophoneAccess();
+  const screenResult = await ensureScreenCaptureAccess();
+
+  // Re-install loopback after permission prompts — some Electron builds clear it.
+  installSystemAudioLoopbackHandler();
+
+  const micStatus =
+    process.platform === "darwin"
+      ? systemPreferences.getMediaAccessStatus("microphone")
+      : "granted";
+  const screenStatus =
+    process.platform === "darwin"
+      ? systemPreferences.getMediaAccessStatus("screen")
+      : "granted";
+
+  return {
+    microphone: {
+      ok: micResult.granted,
+      status: micStatus,
+      message:
+        micResult.message ||
+        (micResult.granted ? "Microphone ready." : "Microphone permission required."),
+    },
+    screen: {
+      ok: screenResult.granted,
+      status: screenStatus,
+      message:
+        screenResult.message ||
+        (screenResult.granted
+          ? "Screen Recording ready."
+          : "Screen Recording permission required."),
+    },
+  };
+}
+
+/** Expose raw screen probe for UI diagnostics. */
+async function getScreenCaptureProbe(): Promise<{
+  status: string;
+  sourceCount: number;
+  sourceNames: string[];
+}> {
+  if (process.platform !== "darwin") {
+    return { status: "granted", sourceCount: 1, sourceNames: ["display"] };
+  }
+  let sources: Electron.DesktopCapturerSource[] = [];
+  try {
+    sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 0, height: 0 },
+    });
+  } catch {
+    /* ignore */
+  }
+  return {
+    status: systemPreferences.getMediaAccessStatus("screen"),
+    sourceCount: sources.length,
+    sourceNames: sources.map((s) => s.name),
+  };
 }
 
 /**
@@ -1116,6 +1274,92 @@ ipcMain.handle("window:set-exclude-from-share", (_event, enabled: boolean) => {
 });
 
 ipcMain.handle("media:ensure-microphone", async () => ensureMicrophoneAccess());
+
+ipcMain.handle("media:ensure-screen-capture", async () =>
+  ensureScreenCaptureAccess()
+);
+
+ipcMain.handle("media:prepare-session", async () => prepareSessionMediaAccess());
+
+ipcMain.handle("media:get-status", () => {
+  if (process.platform !== "darwin") {
+    return { microphone: "granted", screen: "granted", packaged: app.isPackaged };
+  }
+  return {
+    microphone: systemPreferences.getMediaAccessStatus("microphone"),
+    screen: systemPreferences.getMediaAccessStatus("screen"),
+    packaged: app.isPackaged,
+  };
+});
+
+ipcMain.handle("media:open-screen-settings", () => {
+  if (process.platform === "darwin") openMacPrivacyPane("ScreenCapture");
+  return true;
+});
+
+ipcMain.handle("media:open-mic-settings", () => {
+  if (process.platform === "darwin") openMacPrivacyPane("Microphone");
+  return true;
+});
+
+ipcMain.handle("media:reinstall-loopback", (_event, useSystemPicker?: boolean) => {
+  installSystemAudioLoopbackHandler({
+    useSystemPicker: Boolean(useSystemPicker),
+  });
+  return true;
+});
+
+ipcMain.handle("media:screen-probe", async () => getScreenCaptureProbe());
+
+ipcMain.handle("media:reset-tcc", async () => {
+  if (process.platform !== "darwin") {
+    return { ok: false, message: "Permission reset is only needed on macOS." };
+  }
+  const id = "com.finalyear.meetingcue";
+  const services = ["ScreenCapture", "AudioCapture", "Microphone"];
+  const results: string[] = [];
+  for (const service of services) {
+    try {
+      await new Promise<void>((resolve) => {
+        execFile("tccutil", ["reset", service, id], (err, _stdout, stderr) => {
+          results.push(
+            err ? `${service}: ${stderr || err.message}` : `${service}: reset`
+          );
+          resolve();
+        });
+      });
+    } catch (err) {
+      results.push(`${service}: ${String(err)}`);
+    }
+  }
+  return {
+    ok: true,
+    message:
+      "Cleared Meeting Cue privacy entries. The app will quit — reopen from Applications, allow the new prompts, enable the single Meeting Cue row, then System Audio Recording Only when it appears.",
+    results,
+  };
+});
+
+ipcMain.handle("media:quit-app", () => {
+  app.quit();
+  return true;
+});
+
+ipcMain.handle("media:app-info", () => ({
+  name: app.getName(),
+  bundleId: "com.finalyear.meetingcue",
+  path: app.getAppPath(),
+  execPath: process.execPath,
+  packaged: app.isPackaged,
+  screen:
+    process.platform === "darwin"
+      ? systemPreferences.getMediaAccessStatus("screen")
+      : "granted",
+  microphone:
+    process.platform === "darwin"
+      ? systemPreferences.getMediaAccessStatus("microphone")
+      : "granted",
+}));
 
 function isMostlyBlank(image: NativeImage): boolean {
   if (image.isEmpty()) return true;

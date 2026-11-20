@@ -1,4 +1,5 @@
 import { transcribeAudio } from "./ai";
+import { openSystemAudioStream } from "./mediaPermissions";
 import { pcmToWav16k } from "./wav";
 
 export type Speaker = "client" | "me";
@@ -110,39 +111,45 @@ export class DualLiveTranscriber {
       await this.teardownLane(this.client);
       this.client = null;
       this.handlers.onPartial("client", "");
+      try {
+        await window.meetingCue?.disableLoopbackAudio?.();
+      } catch {
+        /* ignore */
+      }
     }
     this.emitStatus();
   }
 
   async attachClientAudio() {
     try {
-      const display = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
-      display.getVideoTracks().forEach((t) => {
-        t.enabled = false;
-      });
-      const audioTracks = display.getAudioTracks();
-      if (!audioTracks.length) {
-        display.getTracks().forEach((t) => t.stop());
-        this.handlers?.onError?.(
-          "No system/call audio captured. Enable sharing audio when prompted."
-        );
-        this.clientWanted = false;
-        return;
-      }
-      const audioOnly = new MediaStream(audioTracks);
-      display.getVideoTracks().forEach((t) => t.stop());
+      const display = await openSystemAudioStream();
       if (this.client) await this.teardownLane(this.client);
-      this.client = this.buildLane(audioOnly, "client");
+      this.client = this.buildLane(display, "client");
       this.clientWanted = true;
       this.emitStatus();
     } catch (err) {
       this.clientWanted = false;
-      this.handlers?.onError?.(
-        `Client audio not connected: ${(err as Error).message}`
+      const raw = (err as Error).message || String(err);
+      const denied =
+        /permission|denied|not allowed|NotAllowedError/i.test(raw) ||
+        (err as DOMException)?.name === "NotAllowedError";
+      const startFail = /Error starting capture|AbortError|NotReadable/i.test(
+        raw
       );
+      let tip = raw;
+      if (denied) {
+        tip =
+          "Permission denied. Enable Meeting Cue in Screen & System Audio Recording, then quit and reopen.";
+      } else if (startFail) {
+        tip =
+          "Capture failed to start. Keep one Meeting Cue ON for Screen Recording and System Audio Recording Only, then Cmd+Q and reopen.";
+      }
+      this.handlers?.onError?.(`Client audio not connected: ${tip}`);
+      try {
+        await window.meetingCue?.disableLoopbackAudio?.();
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -154,6 +161,11 @@ export class DualLiveTranscriber {
     this.client = null;
     this.config = null;
     this.handlers = null;
+    try {
+      await window.meetingCue?.disableLoopbackAudio?.();
+    } catch {
+      /* ignore */
+    }
   }
 
   private async startMicLane() {
